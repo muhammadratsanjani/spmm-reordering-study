@@ -32,3 +32,6 @@ cmake .. -DCMAKE_BUILD_TYPE=Release -DKokkos_ENABLE_OPENMP=ON
 make
 ./05_reordering
 ```
+
+## Future Work
+Porting to GPU using Kokkos Cuda Backend
