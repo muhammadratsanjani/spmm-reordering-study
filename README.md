@@ -1,4 +1,4 @@
-# Kokkos SpMV Experiment: Reordering Effects 🚀
+# Kokkos SpMV Experiment: Reordering Effects
 
 This repository contains my personal implementation of Sparse Matrix-Vector Multiplication (SpMV) using **Kokkos Framework** (C++ Performance Portability). The goal is to study the impact of **Graph Reordering (METIS)** on SpMV performance, inspired by the work of *Islam et al. (SC '25)*.
 
@@ -35,3 +35,6 @@ make
 
 ## Future Work
 Porting to GPU using Kokkos Cuda Backend
+
+## Reproducibility
+Reproducibility_Colab.ipynb
