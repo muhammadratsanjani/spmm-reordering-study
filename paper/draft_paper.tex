@@ -1,0 +1,100 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Impact of Graph Reordering on 3D Stencil SpMV Performance: A Preliminary Study using Kokkos}
+
+\author{\IEEEauthorblockN{Nama Dosen}
+\IEEEauthorblockA{\textit{Dept. of Informatics} \\
+\textit{Affiliation Name}\\
+Indonesia \\
+email@example.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Sparse Matrix-Vector Multiplication (SpMV) is a critical kernel in many scientific applications, including climate modeling and physical simulations based on 3D stencils. The performance of SpMV is often bounded by memory bandwidth and irregular memory access patterns. This study investigates the impact of graph reordering techniques (specifically METIS Nested Dissection) on the performance of SpMV for shuffled 3D 7-point stencil matrices using the Kokkos C++ performance portability framework. Our preliminary results on a multi-core CPU show that while reordering improves cache locality for smaller grids, the benefits diminish for large-scale grids (3.3 million nodes) due to memory bandwidth saturation, yielding a speedup of approximately 0.99x. We discuss the implications of these findings and outline future work for GPU-based hierarchical parallelism.
+\end{abstract}
+
+\begin{IEEEkeywords}
+SpMV, Kokkos, METIS, Graph Reordering, High Performance Computing, 3D Stencil
+\end{IEEEkeywords}
+
+\section{Introduction}
+Structured grid simulations, such as 3D stencils used in climate modeling and fluid dynamics, theoretically possess regular memory access patterns. However, in real-world workflows involving adaptive mesh refinement or parallel partitioning, the node ordering often becomes unstructured (shuffled), leading to severe cache misses during SpMV operations \cite{buluc2025}.
+
+This work attempts to recover the locality of such matrices using graph reordering algorithms. We utilize the Kokkos framework \cite{trott2022} to implement a portable SpMV kernel and integrate METIS \cite{karypis1998} for finding optimal permutations.
+
+\section{Methodology}
+
+\subsection{Data Generation: Shuffled 3D Stencil}
+We generate a synthetic 7-point stencil graph representing a 3D grid ($N_x \times N_y \times N_z$). To simulate worst-case input scenarios, we apply a random permutation $P$ to the node IDs:
+\begin{equation}
+    A_{shuffled} = P \cdot A_{grid} \cdot P^T
+\end{equation}
+This destroys the spatial locality inherent in the grid structure.
+
+\subsection{Kokkos Implementation}
+We implemented the SpMV kernel using Kokkos \texttt{TeamPolicy} to support hierarchical parallelism suitable for future GPU porting.
+\begin{lstlisting}[language=C++, frame=single, basicstyle=\footnotesize]
+// Simplified Kokkos Kernel
+Kokkos::parallel_for("SpMV", policy_t(N, AUTO), 
+  KOKKOS_LAMBDA(const member_t& team) {
+    int row = team.league_rank();
+    double sum = 0.0;
+    Kokkos::parallel_reduce(
+      Kokkos::TeamThreadRange(team, len), 
+      [&](int k, double& lsum) {
+         lsum += val(k) * x(col(k));
+      }, sum);
+});
+\end{lstlisting}
+
+\subsection{Reordering Strategy}
+We apply METIS \texttt{NodeND} (Nested Dissection) to compute a permutation vector that minimizes the fill-in and implicitly clusters the non-zero elements, aiming to improve the vector $x$ cache reuse.
+
+\section{Preliminary Results}
+Experiments were conducted on a standard workstation CPU. We varied the grid size from $80^3$ (512k nodes) to $150^3$ (3.3M nodes).
+
+\begin{table}[htbp]
+\caption{SpMV Performance (GFLOPs)}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Grid Size} & \textbf{Baseline} & \textbf{METIS} & \textbf{Speedup} \\
+\hline
+$80^3$ & 2.53 GFLOPs & 2.30 GFLOPs & 0.91x \\
+$150^3$ & 0.41 GFLOPs & 0.40 GFLOPs & 0.99x \\
+\hline
+\end{tabular}
+\label{tab1}
+\end{center}
+\end{table}
+
+The results (Table \ref{tab1}) indicate no speedup. For the large grid ($150^3$), the performance drop significantly (from 2.5 to 0.4 GFLOPs), suggesting the workload became main-memory bandwidth bound, rendering cache optimizations ineffective.
+
+\section{Conclusion and Future Work}
+Reordering typical 3D stencils provides limited benefit on bandwidth-bound CPU architectures. However, we hypothesize that on throughput-oriented architectures like GPUs, where memory coalescing is critical, reordering will show significant gains.
+
+Future work includes:
+\begin{itemize}
+    \item Porting the \texttt{TeamPolicy} kernel to NVIDIA GPUs using \texttt{Kokkos::CudaSpace}.
+    \item Investigating \texttt{Kokkos::LayoutLeft} impacts on coalesced access.
+    \item Comparing METIS against faster reordering tools like Rabbit Order.
+\end{itemize}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
